@@ -90,6 +90,10 @@ fi
 # ---------------------------------------------------------------- compile
 if [ "${KSU_CHECK_ONLY:-0}" = "1" ]; then
 	log "compile check: drivers/kernelsu"
+	# prepare + init/ are needed because generated/compile.h is only created
+	# while building init/, and drivers/kernelsu includes it.
+	make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" prepare
+	make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" -j1 init/
 	make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" drivers/kernelsu/
 	log "KernelSU objects compiled successfully"
 	exit 0
