@@ -87,6 +87,13 @@ else
 	log "SukiSU Ultra: disabled"
 fi
 
+# ---------------------------------------------------------------- headers
+# flask.h / av_permissions.h are generated while security/selinux is built.
+# drivers/kernelsu includes them, and drivers/ is built in parallel with
+# security/, so generate them up front to avoid a race.
+log "generating SELinux headers"
+make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" security/selinux/ >/dev/null
+
 # ---------------------------------------------------------------- compile
 if [ "${KSU_CHECK_ONLY:-0}" = "1" ]; then
 	log "compile check: drivers/kernelsu"
