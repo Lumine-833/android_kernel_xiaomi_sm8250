@@ -70,6 +70,7 @@ log "applying kernel configuration"
 "$ROOT/scripts/config" --file "$CONFIG" \
 	-e KSU \
 	-e KSU_FEATURE_ADBROOT \
+	-e PS5169 \
 	-d KSU_SUSFS \
 	-d KPM \
 	-d KSU_DEBUG \
