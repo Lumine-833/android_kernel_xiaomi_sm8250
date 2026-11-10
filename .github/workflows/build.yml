@@ -1,0 +1,140 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: 'Device codename (SM8250 / kona family)'
+        required: true
+        default: munch
+        type: choice
+        options:
+          - alioth
+          - apollo
+          - cas
+          - cmi
+          - dagu
+          - elish
+          - enuma
+          - lmi
+          - munch
+          - pipa
+          - psyche
+          - thyme
+          - umi
+      ksu:
+        description: 'Build with SukiSU Ultra (builtin hooks)'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}-${{ inputs.device }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ inputs.device }} | SukiSU:${{ inputs.ksu }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 6G
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential ccache curl flex gawk git gperf \
+            libelf-dev libssl-dev libxml2-utils lz4 lzop python3 \
+            python-is-python3 rsync unzip zip zlib1g-dev
+
+      - name: Set up Clang 16 toolchain
+        run: |
+          mkdir -p "$HOME/toolchain"
+          curl -fL --retry 3 -o "$RUNNER_TEMP/clang.tar.gz" \
+            https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260807-release/Clang-16.0.6-20260807.tar.gz
+          tar -xzf "$RUNNER_TEMP/clang.tar.gz" -C "$HOME/toolchain"
+          CLANG_BIN="$(dirname "$(find "$HOME/toolchain" -maxdepth 3 -type f -name clang | head -n1)")"
+          [ -n "$CLANG_BIN" ] || { echo "clang binary not found"; exit 1; }
+          echo "$CLANG_BIN" >> "$GITHUB_PATH"
+          "$CLANG_BIN/clang" --version
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-${{ inputs.device }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ inputs.device }}-
+            ccache-
+
+      - name: Compile check (KernelSU object, fail fast)
+        if: ${{ inputs.ksu }}
+        run: |
+          KSU_CHECK_ONLY=1 ./build_kernel.sh "${{ inputs.device }}" ksu
+
+      - name: Build kernel
+        run: |
+          if [ "${{ inputs.ksu }}" = "true" ]; then
+            ./build_kernel.sh "${{ inputs.device }}" ksu
+          else
+            ./build_kernel.sh "${{ inputs.device }}" noksu
+          fi
+
+      - name: Show ccache stats
+        if: always()
+        run: ccache -s || true
+
+      - name: Upload flashable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kona-${{ inputs.device }}-${{ github.run_number }}
+          path: |
+            Kona_*.zip
+            out/arch/arm64/boot/Image
+            out/System.map
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.device }}-${{ github.run_number }}
+          name: Kona kernel for ${{ inputs.device }} (${{ inputs.ksu && 'SukiSU Ultra' || 'NoKSU' }})
+          body: |
+            ### Build information
+
+            | Item | Value |
+            | --- | --- |
+            | Device | `${{ inputs.device }}` |
+            | SukiSU Ultra (builtin) | `${{ inputs.ksu }}` |
+            | Kernel | LineageOS android_kernel_xiaomi_sm8250 (4.19) |
+            | Commit | `${{ github.sha }}` |
+            | Run | `${{ github.run_id }}` |
+
+            ### Root
+
+            ${{ inputs.ksu && 'SukiSU Ultra is compiled into the kernel (builtin branch, manual hooks). Install the SukiSU Ultra manager APK matching this build.' || 'This build has no KernelSU integration.' }}
+
+            Flash the zip from a custom recovery, or extract `Image` for a manual boot image repack.
+        files: Kona_*.zip
+        fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
