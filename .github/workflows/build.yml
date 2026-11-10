@@ -100,14 +100,14 @@ jobs:
 
       - name: Compile check KernelSU object
         if: inputs.ksu
-        run: KSU_CHECK_ONLY=1 ./build_kernel.sh "${{ inputs.device }}" ksu
+        run: KSU_CHECK_ONLY=1 bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Build kernel
         run: |
           if [ "${{ inputs.ksu }}" = "true" ]; then
-            ./build_kernel.sh "${{ inputs.device }}" ksu
+            bash ./build_kernel.sh "${{ inputs.device }}" ksu
           else
-            ./build_kernel.sh "${{ inputs.device }}" noksu
+            bash ./build_kernel.sh "${{ inputs.device }}" noksu
           fi
 
       - name: Show ccache statistics
