@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ inputs.device }} | SukiSU:${{ inputs.ksu }}
+    name: ${{ inputs.device }}-${{ inputs.ksu }}
     runs-on: ubuntu-22.04
     timeout-minutes: 180
 
@@ -72,7 +72,10 @@ jobs:
             https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260807-release/Clang-16.0.6-20260807.tar.gz
           tar -xzf "$RUNNER_TEMP/clang.tar.gz" -C "$HOME/toolchain"
           CLANG_BIN="$(dirname "$(find "$HOME/toolchain" -maxdepth 3 -type f -name clang | head -n1)")"
-          [ -n "$CLANG_BIN" ] || { echo "clang binary not found"; exit 1; }
+          if [ -z "$CLANG_BIN" ]; then
+            echo "clang binary not found in the downloaded toolchain"
+            exit 1
+          fi
           echo "$CLANG_BIN" >> "$GITHUB_PATH"
           "$CLANG_BIN/clang" --version
 
@@ -85,10 +88,9 @@ jobs:
             ccache-${{ inputs.device }}-
             ccache-
 
-      - name: Compile check (KernelSU object, fail fast)
-        if: ${{ inputs.ksu }}
-        run: |
-          KSU_CHECK_ONLY=1 ./build_kernel.sh "${{ inputs.device }}" ksu
+      - name: Compile check KernelSU object
+        if: inputs.ksu
+        run: KSU_CHECK_ONLY=1 ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Build kernel
         run: |
@@ -98,7 +100,7 @@ jobs:
             ./build_kernel.sh "${{ inputs.device }}" noksu
           fi
 
-      - name: Show ccache stats
+      - name: Show ccache statistics
         if: always()
         run: ccache -s || true
 
@@ -117,24 +119,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.device }}-${{ github.run_number }}
-          name: Kona kernel for ${{ inputs.device }} (${{ inputs.ksu && 'SukiSU Ultra' || 'NoKSU' }})
-          body: |
-            ### Build information
-
-            | Item | Value |
-            | --- | --- |
-            | Device | `${{ inputs.device }}` |
-            | SukiSU Ultra (builtin) | `${{ inputs.ksu }}` |
-            | Kernel | LineageOS android_kernel_xiaomi_sm8250 (4.19) |
-            | Commit | `${{ github.sha }}` |
-            | Run | `${{ github.run_id }}` |
-
-            ### Root
-
-            ${{ inputs.ksu && 'SukiSU Ultra is compiled into the kernel (builtin branch, manual hooks). Install the SukiSU Ultra manager APK matching this build.' || 'This build has no KernelSU integration.' }}
-
-            Flash the zip from a custom recovery, or extract `Image` for a manual boot image repack.
-        files: Kona_*.zip
-        fail_on_unmatched_files: true
+          name: Kona ${{ inputs.device }} run ${{ github.run_number }}
+          body: LineageOS android_kernel_xiaomi_sm8250 (4.19) built with SukiSU Ultra builtin hooks. Commit ${{ github.sha }}.
+          files: Kona_*.zip
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
