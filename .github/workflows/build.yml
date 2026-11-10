@@ -62,23 +62,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential ccache curl flex gawk git gperf \
-            libelf-dev libssl-dev libxml2-utils lz4 lzop python3 \
+            libelf-dev libssl-dev libxml2-utils llvm lld lz4 lzop python3 \
             python-is-python3 rsync unzip zip zlib1g-dev
 
-      - name: Set up Clang 16 toolchain
+      - name: Set up Clang toolchain
         run: |
           mkdir -p "$HOME/toolchain"
-          curl -fL --retry 3 -o "$RUNNER_TEMP/clang.tar.gz" \
-            https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260807-release/Clang-16.0.6-20260807.tar.gz
-          tar -xzf "$RUNNER_TEMP/clang.tar.gz" -C "$HOME/toolchain"
-          CLANG_BIN="$(dirname "$(find "$HOME/toolchain" -maxdepth 4 -name clang | head -n1)")"
-          if [ ! -x "$CLANG_BIN/clang" ]; then
-            CLANG_BIN="$HOME/toolchain/bin"
+          if curl -fL --retry 3 -o "$RUNNER_TEMP/clang.tar.gz" \
+            https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260807-release/Clang-16.0.6-20260807.tar.gz; then
+            tar -xzf "$RUNNER_TEMP/clang.tar.gz" -C "$HOME/toolchain"
+          else
+            echo "prebuilt toolchain download failed, using distro clang"
           fi
-          if [ ! -x "$CLANG_BIN/clang" ]; then
-            echo "clang binary not found in the downloaded toolchain"
-            find "$HOME/toolchain" -maxdepth 2 | head -20
-            exit 1
+          CLANG_BIN=""
+          for d in "$HOME/toolchain/bin" $(find "$HOME/toolchain" -maxdepth 3 -type d -name bin 2>/dev/null); do
+            if [ -x "$d/clang" ] && [ ! -d "$d/clang" ]; then
+              CLANG_BIN="$d"
+              break
+            fi
+          done
+          if [ -z "$CLANG_BIN" ]; then
+            echo "prebuilt toolchain unusable, falling back to distro clang"
+            sudo apt-get install -y clang lld llvm
+            CLANG_BIN="$(dirname "$(readlink -f "$(command -v clang)")")"
           fi
           echo "$CLANG_BIN" >> "$GITHUB_PATH"
           "$CLANG_BIN/clang" --version
