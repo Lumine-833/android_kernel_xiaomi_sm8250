@@ -89,9 +89,9 @@ fi
 
 # ---------------------------------------------------------------- compile
 if [ "${KSU_CHECK_ONLY:-0}" = "1" ]; then
-	log "compile check: drivers/kernelsu/ksu.o"
-	make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" drivers/kernelsu/ksu.o
-	log "KernelSU object compiled successfully"
+	log "compile check: drivers/kernelsu"
+	make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" drivers/kernelsu/
+	log "KernelSU objects compiled successfully"
 	exit 0
 fi
 

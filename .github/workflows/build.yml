@@ -71,9 +71,13 @@ jobs:
           curl -fL --retry 3 -o "$RUNNER_TEMP/clang.tar.gz" \
             https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260807-release/Clang-16.0.6-20260807.tar.gz
           tar -xzf "$RUNNER_TEMP/clang.tar.gz" -C "$HOME/toolchain"
-          CLANG_BIN="$(dirname "$(find "$HOME/toolchain" -maxdepth 3 -type f -name clang | head -n1)")"
-          if [ -z "$CLANG_BIN" ]; then
+          CLANG_BIN="$(dirname "$(find "$HOME/toolchain" -maxdepth 4 -name clang | head -n1)")"
+          if [ ! -x "$CLANG_BIN/clang" ]; then
+            CLANG_BIN="$HOME/toolchain/bin"
+          fi
+          if [ ! -x "$CLANG_BIN/clang" ]; then
             echo "clang binary not found in the downloaded toolchain"
+            find "$HOME/toolchain" -maxdepth 2 | head -20
             exit 1
           fi
           echo "$CLANG_BIN" >> "$GITHUB_PATH"
