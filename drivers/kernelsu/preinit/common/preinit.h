@@ -2,7 +2,9 @@
 #define __KSU_H_PREINIT
 
 #if !defined(CONFIG_ARM64) || !defined(KSU_CAN_USE_JUMP_LABEL)
+#ifndef KSU_NO_PREINIT
 #define KSU_NO_PREINIT
+#endif
 #endif
 
 #ifndef KSU_NO_PREINIT

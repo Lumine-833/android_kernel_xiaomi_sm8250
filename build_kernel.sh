@@ -72,7 +72,8 @@ log "applying kernel configuration"
 	-e KSU_FEATURE_ADBROOT \
 	-d KSU_SUSFS \
 	-d KPM \
-	-d KSU_DEBUG
+	-d KSU_DEBUG \
+	-d CC_WERROR
 
 if [ "$KSU_MODE" = "noksu" ]; then
 	"$ROOT/scripts/config" --file "$CONFIG" -d KSU
