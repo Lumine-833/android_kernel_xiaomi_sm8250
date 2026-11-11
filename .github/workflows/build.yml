@@ -25,6 +25,11 @@ on:
         required: true
         default: true
         type: boolean
+      release:
+        description: 'Publish the kernel as a GitHub release'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -112,12 +117,22 @@ jobs:
         if: always()
         run: ccache -s || true
 
+      - name: Read build info
+        id: info
+        run: |
+          . ./.build_info
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          echo "zip_base=$ZIP_BASE" >> "$GITHUB_OUTPUT"
+          echo "md5=$MD5" >> "$GITHUB_OUTPUT"
+
       - name: Upload flashable zip
         uses: actions/upload-artifact@v4
         with:
-          name: Kona-${{ inputs.device }}-${{ github.run_number }}
+          name: ${{ steps.info.outputs.zip_base }}
           path: |
-            Kona_*.zip
+            Kernel_*.zip
             out/arch/arm64/boot/Image
             out/System.map
             out/.config
@@ -125,12 +140,13 @@ jobs:
           compression-level: 0
 
       - name: Publish release
+        if: inputs.release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.device }}-${{ github.run_number }}
-          name: Kona ${{ inputs.device }} run ${{ github.run_number }}
-          body: LineageOS android_kernel_xiaomi_sm8250 (4.19) built with SukiSU Ultra builtin hooks. Commit ${{ github.sha }}.
-          files: Kona_*.zip
+          tag_name: ${{ steps.info.outputs.tag }}
+          name: ${{ steps.info.outputs.release_name }}
+          body: "Device `${{ inputs.device }}` | SukiSU Ultra builtin hooks `${{ inputs.ksu }}` | Commit `${{ github.sha }}` | Package MD5 `${{ steps.info.outputs.md5 }}`"
+          files: ${{ steps.info.outputs.zip_name }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

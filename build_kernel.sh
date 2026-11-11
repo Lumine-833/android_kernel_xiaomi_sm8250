@@ -39,6 +39,20 @@ export ARCH=arm64
 export SUBARCH=arm64
 export LC_ALL=C
 
+# ---------------------------------------------------------------- build stamp
+# Names (zip, tag, release) use this timezone. The CI runner is UTC.
+# POSIX TZ spec, so it does not depend on tzdata being installed: UTC-8 == UTC+8.
+TZ_SPEC="${TZ_SPEC:-UTC-8}"
+TZ_OFF="$(TZ="$TZ_SPEC" date +%z)"		# e.g. +0800
+TZ_SIGN="${TZ_OFF:0:1}"
+TZ_HH="$((10#${TZ_OFF:1:2}))"
+TZ_MM="${TZ_OFF:3:2}"
+if [ "$TZ_MM" = "00" ]; then
+	TZ_LABEL="UTC${TZ_SIGN}${TZ_HH}"
+else
+	TZ_LABEL="UTC${TZ_SIGN}${TZ_HH}:${TZ_MM}"
+fi
+
 JOBS="$(nproc)"
 MAKE_OPTS=(-j"$JOBS" O="$OUT" ARCH=arm64 SUBARCH=arm64)
 
@@ -132,20 +146,38 @@ IMAGE="$OUT/arch/arm64/boot/Image"
 log "kernel image: $IMAGE ($(du -h "$IMAGE" | cut -f1))"
 
 # ---------------------------------------------------------------- package
-KSU_TAG="SukiSU"
+KSU_TAG="KSU"
 [ "$KSU_MODE" = "noksu" ] && KSU_TAG="NoKSU"
-GIT_SHA="$(git rev-parse --short=8 HEAD 2>/dev/null || echo unknown)"
-STAMP="$(date +%Y%m%d_%H%M%S)"
-ZIP_NAME="Kona_${DEVICE}_${KSU_TAG}_${STAMP}_${GIT_SHA}.zip"
 
-log "packaging $ZIP_NAME with AnyKernel3"
+BUILD_DATE="$(TZ="$TZ_SPEC" date +%Y%m%d)"
+BUILD_TIME="$(TZ="$TZ_SPEC" date +%H%M%S)"
+BUILD_STAMP="$(TZ="$TZ_SPEC" date +%Y-%m-%d-%H:%M:%S)"
+ZIP_BASE="Kernel_${DEVICE}_${KSU_TAG}_${BUILD_DATE}_${BUILD_TIME}_anykernel3"
+TMP_ZIP=".ak3_${DEVICE}_pending.zip"
+
+log "packaging $ZIP_BASE with AnyKernel3"
 rm -rf "$AK3_DIR"
 git clone --depth=1 --quiet https://github.com/osm0sis/AnyKernel3 "$AK3_DIR"
 cp "$ROOT/.github/anykernel/anykernel.sh" "$AK3_DIR/anykernel.sh"
 sed -i "s/@DEVICE@/${DEVICE}/g" "$AK3_DIR/anykernel.sh"
 cp "$IMAGE" "$AK3_DIR/Image"
 cp "$OUT/System.map" "$AK3_DIR/System.map" 2>/dev/null || true
-(cd "$AK3_DIR" && zip -r9 "$ROOT/$ZIP_NAME" . -x '*.git*' 'README.md' >/dev/null)
+(cd "$AK3_DIR" && zip -r9 "$ROOT/$TMP_ZIP" . -x '*.git*' 'README.md' >/dev/null)
+
+MD5_8="$(md5sum "$ROOT/$TMP_ZIP" | cut -c1-8)"
+ZIP_NAME="${ZIP_BASE}_${MD5_8}.zip"
+mv "$ROOT/$TMP_ZIP" "$ROOT/$ZIP_NAME"
 log "flashable zip: $ROOT/$ZIP_NAME"
 
-echo "$ZIP_NAME" > "$ROOT/.last_zip_name"
+# Everything the workflow needs to name the artifact, tag and release.
+{
+	printf "TAG='v%s-%s'\n" "$BUILD_DATE" "$BUILD_TIME"
+	printf "RELEASE_NAME='Kernel for %s [%s] | %s (%s)'\n" \
+		"$DEVICE" "$KSU_TAG" "$BUILD_STAMP" "$TZ_LABEL"
+	printf "ZIP_NAME='%s'\n" "$ZIP_NAME"
+	printf "ZIP_BASE='%s'\n" "$ZIP_BASE"
+	printf "MD5=%s\n" "$MD5_8"
+} > "$ROOT/.build_info"
+
+log "tag:     v${BUILD_DATE}-${BUILD_TIME}"
+log "release: Kernel for ${DEVICE} [${KSU_TAG}] | ${BUILD_STAMP} (${TZ_LABEL})"
