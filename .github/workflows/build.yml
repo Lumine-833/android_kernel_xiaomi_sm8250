@@ -120,6 +120,7 @@ jobs:
             Kona_*.zip
             out/arch/arm64/boot/Image
             out/System.map
+            out/.config
           if-no-files-found: error
           compression-level: 0
 
