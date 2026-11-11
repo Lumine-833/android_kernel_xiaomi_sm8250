@@ -23,6 +23,14 @@ static void reset_avc_cache(void)
     selnl_notify_policyload(0);
     selinux_status_update_policyload(&selinux_state, 0);
 #endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
+    /*
+     * KernelSU rewrites the policy in place, which bumps the policyload
+     * counter visible through /sys/fs/selinux/status. Put the stock values
+     * back when "hide SELinux modifications" is enabled.
+     */
+    ksu_selinux_hide_refresh_status();
+#endif
     selinux_xfrm_notify_policyload();
 }
 
@@ -208,6 +216,9 @@ out_unlock:
 #else
 
     cpumask_t old_mask;
+
+    /* keep a copy of the policy as it is before KernelSU touches it */
+    ksu_selinux_hide_save_backup();
     db = get_policydb();
 
     rwlock_t *lock = ksu_get_policy_rwlock();
