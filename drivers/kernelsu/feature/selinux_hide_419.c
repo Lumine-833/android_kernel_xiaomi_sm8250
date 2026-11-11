@@ -143,10 +143,13 @@ static int selinux_hide_feature_get(u64 *value)
 
 static int ksu_selinux_hide_enable(void)
 {
-	if (!backup_policy) {
-		pr_err("selinux_hide: no backup policy yet, save the feature and reboot\n");
-		return -EAGAIN;
-	}
+	/*
+	 * The backup is only needed to answer "was this policy modified?"
+	 * questions; the status page can be sanitized without it, so never
+	 * make the toggle fail on a freshly booted system.
+	 */
+	if (!backup_policy)
+		pr_warn("selinux_hide: no policy backup yet, hiding the status page only\n");
 	ksu_status_restore_stock();
 	return 0;
 }
