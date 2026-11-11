@@ -66,6 +66,20 @@ make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" "$DEFCONFIG"
 CONFIG="$OUT/.config"
 [ -f "$CONFIG" ] || die "no .config generated"
 
+# The LineageOS build merges per-device fragments on top of the QCOM defconfig.
+# Without them the kernel has no touchscreen, fingerprint, charger, backlight
+# or machine specific code at all - it still builds, but the device is unusable.
+COMMON_CFG="arch/arm64/configs/vendor/xiaomi/sm8250-common.config"
+DEVICE_CFG="arch/arm64/configs/vendor/xiaomi/${DEVICE}.config"
+MERGE_LIST=("$COMMON_CFG")
+if [ -f "$DEVICE_CFG" ]; then
+	MERGE_LIST+=("$DEVICE_CFG")
+else
+	log "WARNING: $DEVICE_CFG not found, merging the common config only"
+fi
+log "merging device fragments: ${MERGE_LIST[*]}"
+"$ROOT/scripts/kconfig/merge_config.sh" -m -O "$OUT" "$CONFIG" "${MERGE_LIST[@]}" >/dev/null
+
 log "applying kernel configuration"
 "$ROOT/scripts/config" --file "$CONFIG" \
 	-e KSU \
@@ -81,6 +95,8 @@ if [ "$KSU_MODE" = "noksu" ]; then
 fi
 
 make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" olddefconfig >/dev/null
+
+log "config: $(grep -E '^CONFIG_(KSU|TOUCHSCREEN_FOCALTECH|TOUCHSCREEN_FTS|TOUCHSCREEN_XIAOMI_TOUCHFEATURE|PS5169|MACH_XIAOMI_[A-Z]+)=' "$CONFIG" | tr '\n' ' ')"
 
 if [ "$KSU_MODE" != "noksu" ]; then
 	grep -q '^CONFIG_KSU=y' "$CONFIG" || die "CONFIG_KSU was not enabled"
