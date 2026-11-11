@@ -45,6 +45,11 @@ DEFINE_STATIC_KEY_TRUE(susfs_is_log_enabled);
 #else
 #define SUSFS_LOGI(fmt, ...) 
 #define SUSFS_LOGE(fmt, ...) 
+/* 2.4.0 omits the ratelimited no-op macros; they are still referenced by
+ * susfs_add_sus_type()/susfs_add_sus_avd_allowed_by_type() when logging is
+ * compiled out. */
+#define SUSFS_LOGI_RL(fmt, ...)
+#define SUSFS_LOGE_RL(fmt, ...)
 #endif
 
 static DEFINE_MUTEX(susfs_mutex_lock_sus_type);
