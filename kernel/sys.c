@@ -688,8 +688,20 @@ error:
 	return retval;
 }
 
+#ifdef CONFIG_KSU
+extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
+#endif
+
 SYSCALL_DEFINE3(setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
 {
+#ifdef CONFIG_KSU_SUSFS
+	/* With CONFIG_KSU_SUSFS SukiSU does not register the LSM
+	 * task_fix_setuid hook (see drivers/kernelsu/hook/lsm_hook.c),
+	 * so zygote handling / manager fd / umount would never run.
+	 */
+	if (ksu_handle_setresuid(ruid, euid, suid))
+		pr_info("ksu_handle_setresuid() returned an error\n");
+#endif
 	return __sys_setresuid(ruid, euid, suid);
 }
 
