@@ -40,6 +40,10 @@
 #include <linux/init_task.h>
 #include <linux/uaccess.h>
 #include <linux/build_bug.h>
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+#include <linux/susfs_def.h>
+extern bool susfs_is_inode_sus_path(struct inode *inode);
+#endif
 
 #include "internal.h"
 #include "mount.h"
@@ -506,6 +510,9 @@ struct nameidata {
 	struct path	root;
 	struct inode	*inode; /* path.dentry.d_inode */
 	unsigned int	flags;
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	unsigned int	state;
+#endif
 	unsigned	seq, m_seq;
 	int		last_type;
 	unsigned	depth;
@@ -532,6 +539,9 @@ static void set_nameidata(struct nameidata *p, int dfd, struct filename *name)
 	p->total_link_count = old ? old->total_link_count : 0;
 	p->saved = old;
 	current->nameidata = p;
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	p->state = 0;
+#endif
 }
 
 static void restore_nameidata(void)
@@ -1921,6 +1931,14 @@ static int walk_component(struct nameidata *nd, int flags)
 		inode = d_backing_inode(path.dentry);
 	}
 
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	if ((nd->state & (ND_STATE_LOOKUP_LAST | ND_STATE_OPEN_LAST)) &&
+	    path.dentry && d_backing_inode(path.dentry) &&
+	    susfs_is_inode_sus_path(d_backing_inode(path.dentry))) {
+		path_to_nameidata(&path, nd);
+		return -ENOENT;
+	}
+#endif
 	return step_into(nd, &path, flags, inode, seq);
 }
 
@@ -2163,6 +2181,13 @@ static inline u64 hash_name(const void *salt, const char *name)
 static int link_path_walk(const char *name, struct nameidata *nd)
 {
 	int err;
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	struct dentry *dentry = nd->path.dentry;
+
+	/* Do not descend into an already-resolved sus path. */
+	if (dentry->d_inode && susfs_is_inode_sus_path(dentry->d_inode))
+		return -ENOENT;
+#endif
 
 	if (IS_ERR(name))
 		return PTR_ERR(name);
@@ -2361,6 +2386,9 @@ static const char *trailing_symlink(struct nameidata *nd)
 
 static inline int lookup_last(struct nameidata *nd)
 {
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	nd->state |= ND_STATE_LOOKUP_LAST;
+#endif
 	if (nd->last_type == LAST_NORM && nd->last.name[nd->last.len])
 		nd->flags |= LOOKUP_FOLLOW | LOOKUP_DIRECTORY;
 
@@ -3280,6 +3308,14 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 
 	file->f_mode &= ~FMODE_CREATED;
 	dentry = d_lookup(dir, &nd->last);
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	/* Never let O_CREAT recreate / overwrite a hidden path. */
+	if ((nd->state & ND_STATE_OPEN_LAST) && dentry && dentry->d_inode &&
+	    susfs_is_inode_sus_path(dentry->d_inode)) {
+		dput(dentry);
+		return -ENOENT;
+	}
+#endif
 	for (;;) {
 		if (!dentry) {
 			dentry = d_alloc_parallel(dir, &nd->last, &wq);
@@ -3407,6 +3443,9 @@ static int do_last(struct nameidata *nd,
 	struct path path;
 	int error;
 
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	nd->state |= ND_STATE_OPEN_LAST;
+#endif
 	nd->flags &= ~LOOKUP_PARENT;
 	nd->flags |= op->intent;
 
@@ -3520,6 +3559,14 @@ static int do_last(struct nameidata *nd,
 	seq = 0;	/* out of RCU mode, so the value doesn't matter */
 	inode = d_backing_inode(path.dentry);
 finish_lookup:
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	if ((nd->state & ND_STATE_OPEN_LAST) && path.dentry &&
+	    d_backing_inode(path.dentry) &&
+	    susfs_is_inode_sus_path(d_backing_inode(path.dentry))) {
+		path_to_nameidata(&path, nd);
+		return -ENOENT;
+	}
+#endif
 	error = step_into(nd, &path, 0, inode, seq);
 	if (unlikely(error))
 		return error;
