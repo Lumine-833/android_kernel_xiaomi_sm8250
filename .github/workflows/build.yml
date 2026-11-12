@@ -141,10 +141,10 @@ jobs:
           tag_name: ${{ steps.info.outputs.tag }}
           name: ${{ steps.info.outputs.release_name }}
           body: |
-            设备代号：'${{ steps.info.outputs.device }}'
-            KSU集成方式：'${{ steps.info.outputs.ksu_flavor }}'
-            提交编号：'${{ steps.info.outputs.commit_short }}'
-            构建时间：'${{ steps.info.outputs.build_datetime }}'
+            设备代号：`${{ steps.info.outputs.device }}`
+            KSU集成方式：`${{ steps.info.outputs.ksu_flavor }}`
+            提交编号：`${{ steps.info.outputs.commit_short }}`
+            构建时间：`${{ steps.info.outputs.build_datetime }}`
           files: ${{ steps.info.outputs.zip_name }}
           fail_on_unmatched_files: true
         env:
