@@ -74,9 +74,10 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
 	return retval;
 }
 
-#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-/* Expose the two static helpers to fs/susfs.c, which needs to snapshot a
- * spoofed kstatfs when a sus_kstat entry is added. */
+#if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MOUNT)
+/* Expose the two static helpers to fs/susfs.c. Both the sus_kstat
+ * and the sus_mount blocks declare them, so keep them available
+ * for either (or both) configurations. */
 int statfs_by_dentry_wrapper(struct dentry *dentry, struct kstatfs *buf)
 {
 	return statfs_by_dentry(dentry, buf);
@@ -86,7 +87,7 @@ int calculate_f_flags_wrapper(struct vfsmount *mnt)
 {
 	return calculate_f_flags(mnt);
 }
-#endif /* CONFIG_KSU_SUSFS_SUS_KSTAT */
+#endif /* SUS_KSTAT || SUS_MOUNT */
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 /* Fill buf from the spoofed kstatfs snapshot when the inode is marked.
