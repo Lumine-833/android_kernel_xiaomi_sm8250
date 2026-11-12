@@ -125,7 +125,7 @@ jobs:
           echo "ksu_flavor=$KSU_FLAVOR" >> "$GITHUB_OUTPUT"
           echo "ksu_slug=$KSU_SLUG" >> "$GITHUB_OUTPUT"
           echo "build_datetime=$BUILD_DATETIME" >> "$GITHUB_OUTPUT"
-          echo "commit_short=$(git rev-parse --short=14 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Upload flashable zip
         uses: actions/upload-artifact@v4
