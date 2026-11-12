@@ -1932,8 +1932,14 @@ static int walk_component(struct nameidata *nd, int flags)
 	}
 
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	if ((nd->state & (ND_STATE_LOOKUP_LAST | ND_STATE_OPEN_LAST)) &&
-	    path.dentry && d_backing_inode(path.dentry) &&
+	/* Check EVERY resolved component, not only the last one. A sus path can
+	 * be an intermediate directory (.../sus_dir/file), and 4.19
+	 * link_path_walk() walks all components in a single call before
+	 * do_last() sets ND_STATE_OPEN_LAST. The upstream GKI patch covers
+	 * these in lookup_dcache()/__lookup_hash() with unconditional checks.
+	 * susfs_is_current_proc_umounted_app() short-circuits immediately for
+	 * non-app processes, so this stays cheap on the common path. */
+	if (path.dentry && d_backing_inode(path.dentry) &&
 	    susfs_is_inode_sus_path(d_backing_inode(path.dentry))) {
 		path_to_nameidata(&path, nd);
 		return -ENOENT;
