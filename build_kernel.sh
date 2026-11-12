@@ -100,7 +100,7 @@ log "applying kernel configuration"
 	-e KSU_FEATURE_ADBROOT \
 	-e KSU_SUSFS \
 	-e PS5169 \
-	-d KSU_SUSFS_SUS_PATH \
+	-e KSU_SUSFS_SUS_PATH \
 	-d KSU_SUSFS_SUS_MOUNT \
 	-e KSU_SUSFS_SUS_KSTAT \
 	-e KSU_SUSFS_SPOOF_UNAME \
