@@ -624,8 +624,18 @@ SYSCALL_DEFINE1(setuid, uid_t, uid)
  * This function implements a generic ability to update ruid, euid,
  * and suid.  This allows you to implement the 4.4 compatible seteuid().
  */
+#ifdef CONFIG_KSU
+extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
+#endif
+
 long __sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 {
+#ifdef CONFIG_KSU_SUSFS
+	/* With CONFIG_KSU_SUSFS SukiSU does not register the LSM
+	 * task_fix_setuid hook; zygote handling (manager fd, umount,
+	 * seccomp) happens here instead. Matches the upstream v2.4.0 patch. */
+	(void)ksu_handle_setresuid(ruid, euid, suid);
+#endif
 	struct user_namespace *ns = current_user_ns();
 	const struct cred *old;
 	struct cred *new;
@@ -689,20 +699,8 @@ error:
 	return retval;
 }
 
-#ifdef CONFIG_KSU
-extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
-#endif
-
 SYSCALL_DEFINE3(setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
 {
-#ifdef CONFIG_KSU_SUSFS
-	/* With CONFIG_KSU_SUSFS SukiSU does not register the LSM
-	 * task_fix_setuid hook (see drivers/kernelsu/hook/lsm_hook.c),
-	 * so zygote handling / manager fd / umount would never run.
-	 */
-	if (ksu_handle_setresuid(ruid, euid, suid))
-		pr_info("ksu_handle_setresuid() returned an error\n");
-#endif
 	return __sys_setresuid(ruid, euid, suid);
 }
 
