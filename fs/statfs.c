@@ -67,6 +67,20 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
 	return retval;
 }
 
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+/* Expose the two static helpers to fs/susfs.c, which needs to snapshot a
+ * spoofed kstatfs when a sus_kstat entry is added. */
+int statfs_by_dentry_wrapper(struct dentry *dentry, struct kstatfs *buf)
+{
+	return statfs_by_dentry(dentry, buf);
+}
+
+int calculate_f_flags_wrapper(struct vfsmount *mnt)
+{
+	return calculate_f_flags(mnt);
+}
+#endif /* CONFIG_KSU_SUSFS_SUS_KSTAT */
+
 int vfs_statfs(const struct path *path, struct kstatfs *buf)
 {
 	int error;
