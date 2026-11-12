@@ -268,6 +268,18 @@ do_stop_machine:
 out_flush:
     smp_mb();
     reset_avc_cache();
+#ifdef CONFIG_KSU_SUSFS
+    /* The >= 5.10 branch calls susfs_set_batch_sid() after rebuilding the
+     * policy. On 4.19 the policydb is patched in place through this branch
+     * and the call was missing, leaving every susfs SID at 0.
+     * ksu_handle_setresuid() then never matches the zygote domain, so the
+     * manager app never gets its [ksu_driver] fd even though su and modules
+     * work. Call it here, after the policy lock has been released. */
+    {
+        extern void susfs_set_batch_sid(void);
+        susfs_set_batch_sid();
+    }
+#endif
 #endif
 }
 

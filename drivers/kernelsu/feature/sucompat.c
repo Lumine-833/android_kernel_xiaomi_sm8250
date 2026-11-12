@@ -179,6 +179,54 @@ int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
                         flags);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
+/* 4.19 VFS entry points hand us a const char __user *; there is no
+ * struct filename on these paths. Read the user string, match the su path
+ * and repoint the caller at the sh user string, exactly like the upstream
+ * struct filename ** variants do for GKI 5.10+. */
+int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
+                         int *__unused_flags)
+{
+    char path[sizeof(su_path)] = { 0 };
+    long len;
+
+    if (unlikely(!filename_user || !*filename_user))
+        return 0;
+    len = ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
+    if (unlikely(len <= 0))
+        return 0;
+    if (likely(memcmp(path, su_path, sizeof(su_path))))
+        return 0;
+    if (current_chrooted()) {
+        pr_err("ksu_handle_faccessat: su found but NOT allowed! Because current process is running in chrooted environment\n");
+        return 0;
+    }
+    pr_info("ksu_handle_faccessat: su->sh!\n");
+    *filename_user = sh_user_path();
+    return 0;
+}
+
+int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
+{
+    char path[sizeof(su_path)] = { 0 };
+    long len;
+
+    if (unlikely(!filename_user || !*filename_user))
+        return 0;
+    len = ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
+    if (unlikely(len <= 0))
+        return 0;
+    if (likely(memcmp(path, su_path, sizeof(su_path))))
+        return 0;
+    if (current_chrooted()) {
+        pr_err("ksu_handle_stat: su found but NOT allowed! Because current process is running in chrooted environment\n");
+        return 0;
+    }
+    pr_info("ksu_handle_stat: su->sh!\n");
+    *filename_user = sh_user_path();
+    return 0;
+}
+#else
 int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode,
              int *__unused_flags)
 {
@@ -216,6 +264,7 @@ int ksu_handle_stat(int *dfd, struct filename **filename, int *flags) {
     memcpy((void *)((*filename)->name), sh_path, sizeof(sh_path));
     return 0;
 }
+#endif /* < 5.10 */
 
 #else
 __attribute__((hot)) static __always_inline bool __is_su_allowed(const void **ptr_to_check)
