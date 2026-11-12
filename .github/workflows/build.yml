@@ -120,7 +120,7 @@ jobs:
           echo "ksu_flavor=$KSU_FLAVOR" >> "$GITHUB_OUTPUT"
           echo "ksu_slug=$KSU_SLUG" >> "$GITHUB_OUTPUT"
           echo "build_datetime=$BUILD_DATETIME" >> "$GITHUB_OUTPUT"
-          echo "commit_short=$(git rev-parse --short=14 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Upload flashable zip
         uses: actions/upload-artifact@v4
@@ -143,7 +143,7 @@ jobs:
           body: |
             设备代号：`${{ steps.info.outputs.device }}`
             KSU集成方式：`${{ steps.info.outputs.ksu_flavor }}`
-            提交编号：`${{ steps.info.outputs.commit_short }}`
+            提交编号：`${{ steps.info.outputs.commit_sha }}`
             构建时间：`${{ steps.info.outputs.build_datetime }}`
           files: ${{ steps.info.outputs.zip_name }}
           fail_on_unmatched_files: true
