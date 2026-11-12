@@ -9,6 +9,13 @@
 #include <linux/security.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+#include <linux/cred.h>
+#include <linux/susfs_def.h>
+extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);
+extern int susfs_sus_kstat_spoof_vfs_statfs(struct inode *inode,
+		struct kstatfs *buf, bool *is_fuse);
+#endif
 #include "internal.h"
 
 static int flags_by_mnt(int mnt_flags)
@@ -81,10 +88,46 @@ int calculate_f_flags_wrapper(struct vfsmount *mnt)
 }
 #endif /* CONFIG_KSU_SUSFS_SUS_KSTAT */
 
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+/* Fill buf from the spoofed kstatfs snapshot when the inode is marked.
+ * Returns 0 when the buffer was spoofed (statfs_by_dentry not needed). */
+static int susfs_statfs_by_dentry(const struct path *path, struct kstatfs *buf,
+				  bool *is_fuse)
+{
+	struct dentry *dentry = path->dentry;
+	int retval;
+
+	if (!dentry->d_sb->s_op->statfs)
+		return -ENOSYS;
+	memset(buf, 0, sizeof(*buf));
+	retval = security_sb_statfs(dentry);
+	if (retval)
+		return retval;
+	if (!susfs_sus_kstat_spoof_vfs_statfs(d_backing_inode(dentry), buf,
+					     is_fuse)) {
+		if (buf->f_frsize == 0)
+			buf->f_frsize = buf->f_bsize;
+		return 0;
+	}
+	retval = statfs_by_dentry(dentry, buf);
+	if (!retval)
+		buf->f_flags = calculate_f_flags(path->mnt);
+	return retval;
+}
+#endif
+
 int vfs_statfs(const struct path *path, struct kstatfs *buf)
 {
 	int error;
 
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+	if (susfs_is_current_app_uid()) {
+		bool is_fuse = false;
+		if (susfs_is_inode_sus_kstat(d_backing_inode(path->dentry),
+				     &is_fuse))
+			return susfs_statfs_by_dentry(path, buf, &is_fuse);
+	}
+#endif
 	error = statfs_by_dentry(path->dentry, buf);
 	if (!error)
 		buf->f_flags = calculate_f_flags(path->mnt);

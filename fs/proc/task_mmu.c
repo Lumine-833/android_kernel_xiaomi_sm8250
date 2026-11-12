@@ -19,6 +19,12 @@
 #include <linux/shmem_fs.h>
 #include <linux/uaccess.h>
 #include <linux/pkeys.h>
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+#include <linux/cred.h>
+#include <linux/susfs_def.h>
+extern void susfs_sus_kstat_spoof_show_map_vma(struct inode *inode,
+		dev_t *out_dev, unsigned long *out_ino);
+#endif
 #include <linux/mm_inline.h>
 #include <linux/ctype.h>
 
@@ -365,6 +371,9 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
 		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+		susfs_sus_kstat_spoof_show_map_vma(inode, &dev, &ino);
+#endif
 	}
 
 	start = vma->vm_start;

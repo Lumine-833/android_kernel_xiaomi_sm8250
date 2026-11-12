@@ -17,6 +17,13 @@
 #include <linux/syscalls.h>
 #include <linux/pagemap.h>
 #include <linux/compat.h>
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+#include <linux/cred.h>
+#include <linux/susfs_def.h>
+extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);
+extern void susfs_sus_kstat_spoof_generic_fillattr(struct inode *inode,
+		struct kstat *stat, u32 result_mask);
+#endif
 
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
@@ -75,6 +82,34 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
 	stat->result_mask |= STATX_BASIC_STATS;
 	request_mask &= STATX_ALL;
 	query_flags &= KSTAT_QUERY_FLAGS;
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+	{
+		u32 sus_mask = 0;
+		int err = 0;
+
+		if (susfs_is_current_app_uid()) {
+			bool is_fuse = false;
+			if (susfs_is_inode_sus_kstat(inode, &is_fuse))
+				sus_mask = is_fuse ? STATX_SUS_KSTAT_FUSE
+						   : STATX_SUS_KSTAT;
+		}
+		if (sus_mask) {
+			if (inode->i_op->getattr)
+				err = inode->i_op->getattr(path, stat, request_mask,
+							   query_flags);
+			else
+				generic_fillattr(inode, stat);
+			if (!err) {
+				susfs_sus_kstat_spoof_generic_fillattr(inode, stat,
+								     sus_mask);
+				/* private markers must never reach userspace statx */
+				stat->result_mask &= ~(STATX_SUS_KSTAT |
+						       STATX_SUS_KSTAT_FUSE);
+			}
+			return err;
+		}
+	}
+#endif
 	if (inode->i_op->getattr)
 		return inode->i_op->getattr(path, stat, request_mask,
 					    query_flags);
