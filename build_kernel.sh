@@ -146,13 +146,24 @@ IMAGE="$OUT/arch/arm64/boot/Image"
 log "kernel image: $IMAGE ($(du -h "$IMAGE" | cut -f1))"
 
 # ---------------------------------------------------------------- package
-KSU_TAG="KSU"
-[ "$KSU_MODE" = "noksu" ] && KSU_TAG="NoKSU"
+# Flavour comes from what was actually built, so one script serves every
+# branch: NoKSU / SukiSU / SukiSU+SuSFS.
+if [ "$KSU_MODE" = "noksu" ]; then
+	KSU_FLAVOR="NoKSU"
+	KSU_SLUG="noksu"
+elif grep -q '^CONFIG_KSU_SUSFS=y' "$CONFIG"; then
+	KSU_FLAVOR="SukiSU+SuSFS"
+	KSU_SLUG="sukisu-susfs"
+else
+	KSU_FLAVOR="SukiSU"
+	KSU_SLUG="sukisu"
+fi
 
 BUILD_DATE="$(TZ="$TZ_SPEC" date +%Y%m%d)"
 BUILD_TIME="$(TZ="$TZ_SPEC" date +%H%M%S)"
 BUILD_STAMP="$(TZ="$TZ_SPEC" date +%Y-%m-%d-%H:%M:%S)"
-ZIP_BASE="Kernel_${DEVICE}_${KSU_TAG}_${BUILD_DATE}_${BUILD_TIME}_anykernel3"
+BUILD_DATETIME="$(TZ="$TZ_SPEC" date +'%Y-%m-%d %H:%M:%S')"
+ZIP_BASE="Kernel_${DEVICE}_${KSU_SLUG}_${BUILD_DATE}_${BUILD_TIME}_anykernel3"
 TMP_ZIP=".ak3_${DEVICE}_pending.zip"
 
 log "packaging $ZIP_BASE with AnyKernel3"
@@ -172,12 +183,16 @@ log "flashable zip: $ROOT/$ZIP_NAME"
 # Everything the workflow needs to name the artifact, tag and release.
 {
 	printf "TAG='v%s-%s'\n" "$BUILD_DATE" "$BUILD_TIME"
-	printf "RELEASE_NAME='Kernel for %s [%s] | %s (%s)'\n" \
-		"$DEVICE" "$KSU_TAG" "$BUILD_STAMP" "$TZ_LABEL"
+	printf "RELEASE_NAME='Kernel for %s [%s]'\n" "$DEVICE" "$KSU_FLAVOR"
 	printf "ZIP_NAME='%s'\n" "$ZIP_NAME"
 	printf "ZIP_BASE='%s'\n" "$ZIP_BASE"
 	printf "MD5=%s\n" "$MD5_8"
+	printf "DEVICE='%s'\n" "$DEVICE"
+	printf "KSU_FLAVOR='%s'\n" "$KSU_FLAVOR"
+	printf "KSU_SLUG='%s'\n" "$KSU_SLUG"
+	printf "BUILD_DATETIME='%s'\n" "$BUILD_DATETIME"
 } > "$ROOT/.build_info"
 
 log "tag:     v${BUILD_DATE}-${BUILD_TIME}"
-log "release: Kernel for ${DEVICE} [${KSU_TAG}] | ${BUILD_STAMP} (${TZ_LABEL})"
+log "release: Kernel for ${DEVICE} [${KSU_FLAVOR}]"
+log "zip:     ${ZIP_NAME}"
