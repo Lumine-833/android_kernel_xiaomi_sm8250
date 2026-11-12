@@ -180,6 +180,21 @@ int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
+/* SuSFS v2.4.0 gates sucompat at the fs/ syscall entry points. Our 4.19
+ * call sites are unconditional, so reproduce that gate here: without it
+ * every process gets /system/bin/su redirected to /system/bin/sh and sees
+ * a fake, executable su file ("su globally mounted").
+ * These are exactly the checks __is_su_allowed() uses in the non-SUSFS
+ * branch of this file, so all symbols are already visible here. */
+static inline bool susfs_419_su_allowed(void)
+{
+    if (!ksu_su_compat_enabled)
+        return false;
+    if (likely(test_thread_flag(TIF_SECCOMP)))
+        return false;
+    return __ksu_is_allow_uid_for_current(current_uid().val);
+}
+
 /* 4.19 VFS entry points hand us a const char __user *; there is no
  * struct filename on these paths. Read the user string, match the su path
  * and repoint the caller at the sh user string, exactly like the upstream
@@ -191,6 +206,8 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
     long len;
 
     if (unlikely(!filename_user || !*filename_user))
+        return 0;
+    if (!susfs_419_su_allowed())
         return 0;
     len = ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
     if (unlikely(len <= 0))
@@ -212,6 +229,8 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
     long len;
 
     if (unlikely(!filename_user || !*filename_user))
+        return 0;
+    if (!susfs_419_su_allowed())
         return 0;
     len = ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
     if (unlikely(len <= 0))
