@@ -62,13 +62,6 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          # Azure-hosted runners occasionally fail to resolve their internal
-          # apt mirror (azure.archive.ubuntu.com), which aborts the job before
-          # any kernel code is compiled. Fall back to the public archive.
-          if [ -f /etc/apt/apt-mirrors.txt ]; then
-            sudo sed -i 's|azure[.]archive[.]ubuntu[.]com|archive.ubuntu.com|g' \
-              /etc/apt/apt-mirrors.txt || true
-          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential ccache curl flex gawk git gperf \
