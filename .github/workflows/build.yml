@@ -25,11 +25,6 @@ on:
         required: true
         default: true
         type: boolean
-      release:
-        description: 'Publish the kernel as a GitHub release'
-        required: true
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -126,6 +121,11 @@ jobs:
           echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
           echo "zip_base=$ZIP_BASE" >> "$GITHUB_OUTPUT"
           echo "md5=$MD5" >> "$GITHUB_OUTPUT"
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          echo "ksu_flavor=$KSU_FLAVOR" >> "$GITHUB_OUTPUT"
+          echo "ksu_slug=$KSU_SLUG" >> "$GITHUB_OUTPUT"
+          echo "build_datetime=$BUILD_DATETIME" >> "$GITHUB_OUTPUT"
+          echo "commit_short=$(git rev-parse --short=14 HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Upload flashable zip
         uses: actions/upload-artifact@v4
@@ -139,14 +139,3 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-      - name: Publish release
-        if: inputs.release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.info.outputs.tag }}
-          name: ${{ steps.info.outputs.release_name }}
-          body: "Device `${{ inputs.device }}` | SukiSU Ultra builtin hooks `${{ inputs.ksu }}` | Commit `${{ github.sha }}` | Package MD5 `${{ steps.info.outputs.md5 }}`"
-          files: ${{ steps.info.outputs.zip_name }}
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
