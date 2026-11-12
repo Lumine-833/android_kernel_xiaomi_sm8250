@@ -20,11 +20,6 @@ on:
           - psyche
           - thyme
           - umi
-      ksu:
-        description: 'Build with SukiSU Ultra (builtin hooks)'
-        required: true
-        default: true
-        type: boolean
       release:
         description: 'Publish the kernel as a GitHub release'
         required: true
@@ -40,7 +35,7 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ inputs.device }}-${{ inputs.ksu }}
+    name: ${{ inputs.device }}-sukisu-susfs
     runs-on: ubuntu-22.04
     timeout-minutes: 180
 
@@ -102,16 +97,11 @@ jobs:
             ccache-
 
       - name: Compile check KernelSU object
-        if: inputs.ksu
         run: KSU_CHECK_ONLY=1 bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Build kernel
         run: |
-          if [ "${{ inputs.ksu }}" = "true" ]; then
-            bash ./build_kernel.sh "${{ inputs.device }}" ksu
-          else
-            bash ./build_kernel.sh "${{ inputs.device }}" noksu
-          fi
+          bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Show ccache statistics
         if: always()
@@ -126,6 +116,11 @@ jobs:
           echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
           echo "zip_base=$ZIP_BASE" >> "$GITHUB_OUTPUT"
           echo "md5=$MD5" >> "$GITHUB_OUTPUT"
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          echo "ksu_flavor=$KSU_FLAVOR" >> "$GITHUB_OUTPUT"
+          echo "ksu_slug=$KSU_SLUG" >> "$GITHUB_OUTPUT"
+          echo "build_datetime=$BUILD_DATETIME" >> "$GITHUB_OUTPUT"
+          echo "commit_short=$(git rev-parse --short=14 HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Upload flashable zip
         uses: actions/upload-artifact@v4
@@ -145,7 +140,11 @@ jobs:
         with:
           tag_name: ${{ steps.info.outputs.tag }}
           name: ${{ steps.info.outputs.release_name }}
-          body: "Device `${{ inputs.device }}` | SukiSU Ultra builtin hooks `${{ inputs.ksu }}` | Commit `${{ github.sha }}` | Package MD5 `${{ steps.info.outputs.md5 }}`"
+          body: |
+            设备代号：'${{ steps.info.outputs.device }}'
+            KSU集成方式：'${{ steps.info.outputs.ksu_flavor }}'
+            提交编号：'${{ steps.info.outputs.commit_short }}'
+            构建时间：'${{ steps.info.outputs.build_datetime }}'
           files: ${{ steps.info.outputs.zip_name }}
           fail_on_unmatched_files: true
         env:
