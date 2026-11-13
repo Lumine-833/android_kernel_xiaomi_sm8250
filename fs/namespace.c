@@ -34,6 +34,12 @@
 #include "pnode.h"
 #include "internal.h"
 
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+#include <linux/jump_label.h>
+extern bool susfs_is_current_ksu_domain(void);
+extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
+#endif
+
 /* Maximum number of mounts in a mount namespace */
 unsigned int sysctl_mount_max __read_mostly = 100000;
 
@@ -102,7 +108,19 @@ static inline struct hlist_head *mp_hash(struct dentry *dentry)
 
 static int mnt_alloc_id(struct mount *mnt)
 {
-	int res = ida_alloc(&mnt_id_ida, GFP_KERNEL);
+	int res;
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	/* Mounts created by the KSU domain get ids from a clearly separated
+	 * range, so the read-side hooks can filter them without an extra
+	 * flag in struct mount. The sdcard key is always true on 4.19. */
+	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted) &&
+	    susfs_is_current_ksu_domain())
+		res = ida_alloc_min(&mnt_id_ida, DEFAULT_KSU_MNT_ID, GFP_KERNEL);
+	else
+		res = ida_alloc(&mnt_id_ida, GFP_KERNEL);
+#else
+	res = ida_alloc(&mnt_id_ida, GFP_KERNEL);
+#endif
 
 	if (res < 0)
 		return res;
@@ -120,7 +138,16 @@ static void mnt_free_id(struct mount *mnt)
  */
 static int mnt_alloc_group_id(struct mount *mnt)
 {
-	int res = ida_alloc_min(&mnt_group_ida, 1, GFP_KERNEL);
+	int res;
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	if (susfs_is_current_ksu_domain())
+		res = ida_alloc_min(&mnt_group_ida, DEFAULT_KSU_MNT_GROUP_ID,
+				    GFP_KERNEL);
+	else
+		res = ida_alloc_min(&mnt_group_ida, 1, GFP_KERNEL);
+#else
+	res = ida_alloc_min(&mnt_group_ida, 1, GFP_KERNEL);
+#endif
 
 	if (res < 0)
 		return res;
@@ -603,6 +630,19 @@ struct mount *__lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
 {
 	struct hlist_head *head = m_hash(mnt, dentry);
 	struct mount *p;
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	/* An umounted app must only see the legit mount at this mountpoint;
+	 * KSU mounts all carry ids >= DEFAULT_KSU_MNT_ID. */
+	if (susfs_is_current_proc_umounted()) {
+		hlist_for_each_entry_rcu(p, head, mnt_hash)
+			if (p->mnt_id < DEFAULT_KSU_MNT_ID &&
+			    &p->mnt_parent->mnt == mnt &&
+			    p->mnt_mountpoint == dentry)
+				return p;
+		return NULL;
+	}
+#endif
 
 	hlist_for_each_entry_rcu(p, head, mnt_hash)
 		if (&p->mnt_parent->mnt == mnt && p->mnt_mountpoint == dentry)
