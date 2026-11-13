@@ -13,6 +13,7 @@
 #include <linux/fs_struct.h>
 #include <linux/sched/task.h>
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+#include <linux/cred.h>
 #include <linux/susfs_def.h>
 #include <linux/jump_label.h>
 extern struct static_key_false susfs_is_hide_sus_mnts_for_non_su_procs_enabled;
