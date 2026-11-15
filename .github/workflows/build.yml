@@ -1,0 +1,152 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: 'Device codename (SM8250 / kona family)'
+        required: true
+        default: munch
+        type: choice
+        options:
+          - alioth
+          - apollo
+          - cas
+          - dagu
+          - elish
+          - enuma
+          - lmi
+          - munch
+          - psyche
+          - thyme
+          - umi
+      ksu:
+        description: 'Build with SukiSU Nova (builtin-new auto hooks)'
+        required: true
+        default: true
+        type: boolean
+      release:
+        description: 'Publish the kernel as a GitHub release'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}-${{ inputs.device }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ inputs.device }}-${{ inputs.ksu }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 6G
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential ccache curl flex gawk git gperf \
+            libelf-dev libssl-dev libxml2-utils llvm lld lz4 lzop python3 \
+            python-is-python3 rsync unzip zip zlib1g-dev
+
+      - name: Set up Clang toolchain
+        run: |
+          mkdir -p "$HOME/toolchain"
+          if curl -fL --retry 3 -o "$RUNNER_TEMP/clang.tar.gz" \
+            https://github.com/ZyCromerZ/Clang/releases/download/16.0.6-20260807-release/Clang-16.0.6-20260807.tar.gz; then
+            tar -xzf "$RUNNER_TEMP/clang.tar.gz" -C "$HOME/toolchain"
+          else
+            echo "prebuilt toolchain download failed, using distro clang"
+          fi
+          CLANG_BIN=""
+          for d in "$HOME/toolchain/bin" $(find "$HOME/toolchain" -maxdepth 3 -type d -name bin 2>/dev/null); do
+            if [ -x "$d/clang" ] && [ ! -d "$d/clang" ]; then
+              CLANG_BIN="$d"
+              break
+            fi
+          done
+          if [ -z "$CLANG_BIN" ]; then
+            echo "prebuilt toolchain unusable, falling back to distro clang"
+            sudo apt-get install -y clang lld llvm
+            CLANG_BIN="$(dirname "$(readlink -f "$(command -v clang)")")"
+          fi
+          echo "$CLANG_BIN" >> "$GITHUB_PATH"
+          "$CLANG_BIN/clang" --version
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-${{ inputs.device }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ inputs.device }}-
+            ccache-
+
+      - name: Compile check KernelSU object
+        if: inputs.ksu
+        run: KSU_CHECK_ONLY=1 bash ./build_kernel.sh "${{ inputs.device }}" ksu
+
+      - name: Build kernel
+        run: |
+          if [ "${{ inputs.ksu }}" = "true" ]; then
+            bash ./build_kernel.sh "${{ inputs.device }}" ksu
+          else
+            bash ./build_kernel.sh "${{ inputs.device }}" noksu
+          fi
+
+      - name: Show ccache statistics
+        if: always()
+        run: ccache -s || true
+
+      - name: Read build info
+        id: info
+        run: |
+          . ./.build_info
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          echo "zip_base=$ZIP_BASE" >> "$GITHUB_OUTPUT"
+          echo "md5=$MD5" >> "$GITHUB_OUTPUT"
+
+      - name: Upload flashable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.info.outputs.zip_base }}
+          path: |
+            Kernel_*.zip
+            out/arch/arm64/boot/Image
+            out/System.map
+            out/.config
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish release
+        if: inputs.release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.tag }}
+          name: ${{ steps.info.outputs.release_name }}
+          body: "Device `${{ inputs.device }}` | SukiSU Nova builtin-new auto hooks `${{ inputs.ksu }}` | Commit `${{ github.sha }}` | Package MD5 `${{ steps.info.outputs.md5 }}`"
+          files: ${{ steps.info.outputs.zip_name }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
