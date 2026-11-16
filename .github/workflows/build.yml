@@ -123,6 +123,8 @@ jobs:
           . ./.build_info
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+          echo "ksu_release=$KSU_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "build_time_full=$BUILD_TIME_FULL" >> "$GITHUB_OUTPUT"
           echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
           echo "zip_base=$ZIP_BASE" >> "$GITHUB_OUTPUT"
           echo "md5=$MD5" >> "$GITHUB_OUTPUT"
@@ -145,7 +147,11 @@ jobs:
         with:
           tag_name: ${{ steps.info.outputs.tag }}
           name: ${{ steps.info.outputs.release_name }}
-          body: "Device `${{ inputs.device }}` | SukiSU Nova builtin-new auto hooks `${{ inputs.ksu }}` | Commit `${{ github.sha }}` | Package MD5 `${{ steps.info.outputs.md5 }}`"
+          body: |
+            设备代号：`${{ inputs.device }}`
+            KSU集成方式：`${{ steps.info.outputs.ksu_release }}`
+            提交编号：`${{ github.sha }}`
+            构建时间：`${{ steps.info.outputs.build_time_full }}`
           files: ${{ steps.info.outputs.zip_name }}
           fail_on_unmatched_files: true
         env:
