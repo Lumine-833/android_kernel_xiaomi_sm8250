@@ -154,9 +154,14 @@ log "kernel image: $IMAGE ($(du -h "$IMAGE" | cut -f1))"
 KSU_TAG="Nova"
 [ "$KSU_MODE" = "noksu" ] && KSU_TAG="NoKSU"
 
+# Release-facing KSU label: title/body use SukiSU or NoKSU (zip naming keeps KSU_TAG).
+KSU_RELEASE="SukiSU"
+[ "$KSU_MODE" = "noksu" ] && KSU_RELEASE="NoKSU"
+
 BUILD_DATE="$(TZ="$TZ_SPEC" date +%Y%m%d)"
 BUILD_TIME="$(TZ="$TZ_SPEC" date +%H%M%S)"
 BUILD_STAMP="$(TZ="$TZ_SPEC" date +%Y-%m-%d-%H:%M:%S)"
+BUILD_TIME_FULL="$(TZ="$TZ_SPEC" date '+%Y-%m-%d %H:%M:%S')"
 ZIP_BASE="Kernel_${DEVICE}_${KSU_TAG}_${BUILD_DATE}_${BUILD_TIME}_anykernel3"
 TMP_ZIP=".ak3_${DEVICE}_pending.zip"
 
@@ -177,12 +182,13 @@ log "flashable zip: $ROOT/$ZIP_NAME"
 # Everything the workflow needs to name the artifact, tag and release.
 {
 	printf "TAG='v%s-%s'\n" "$BUILD_DATE" "$BUILD_TIME"
-	printf "RELEASE_NAME='Kernel for %s [%s] | %s (%s)'\n" \
-		"$DEVICE" "$KSU_TAG" "$BUILD_STAMP" "$TZ_LABEL"
+	printf "RELEASE_NAME='Kernel for %s [%s]'\n" "$DEVICE" "$KSU_RELEASE"
+	printf "KSU_RELEASE='%s'\n" "$KSU_RELEASE"
+	printf "BUILD_TIME_FULL='%s'\n" "$BUILD_TIME_FULL"
 	printf "ZIP_NAME='%s'\n" "$ZIP_NAME"
 	printf "ZIP_BASE='%s'\n" "$ZIP_BASE"
 	printf "MD5=%s\n" "$MD5_8"
 } > "$ROOT/.build_info"
 
 log "tag:     v${BUILD_DATE}-${BUILD_TIME}"
-log "release: Kernel for ${DEVICE} [${KSU_TAG}] | ${BUILD_STAMP} (${TZ_LABEL})"
+log "release: Kernel for ${DEVICE} [${KSU_RELEASE}]"
