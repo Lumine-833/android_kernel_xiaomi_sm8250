@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       device:
-        description: 'Device codename (SM8250 / kona family)'
+        description: '设备代号（骁龙865/870机型）'
         required: true
         default: alioth
         type: choice
@@ -21,12 +21,12 @@ on:
           - thyme
           - umi
       ksu:
-        description: 'Build with SukiSU Nova (builtin-new auto hooks)'
+        description: '集成 SukiSU Nova (builtin-new分支注入)'
         required: true
         default: true
         type: boolean
       release:
-        description: 'Publish the kernel as a GitHub release'
+        description: '将编译结果发布到Release'
         required: true
         default: true
         type: boolean
