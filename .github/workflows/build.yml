@@ -6,7 +6,7 @@ on:
       device:
         description: 'Device codename (SM8250 / kona family)'
         required: true
-        default: munch
+        default: alioth
         type: choice
         options:
           - alioth
