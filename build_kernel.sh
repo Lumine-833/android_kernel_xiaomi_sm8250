@@ -153,7 +153,7 @@ IMAGE="$OUT/arch/arm64/boot/Image"
 log "kernel image: $IMAGE ($(du -h "$IMAGE" | cut -f1))"
 
 # ---------------------------------------------------------------- package
-KSU_TAG="Nova"
+KSU_TAG="sukisu"
 [ "$KSU_MODE" = "noksu" ] && KSU_TAG="NoKSU"
 
 # Release-facing KSU label: title/body use SukiSU or NoKSU (zip naming keeps KSU_TAG).
