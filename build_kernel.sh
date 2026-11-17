@@ -101,6 +101,7 @@ log "applying kernel configuration"
 	-e KSU_HACK_ARM64_BRANCH_LINK \
 	-e KSU_LSM_SECURITY_HOOKS \
 	-e PS5169 \
+	-e FUSE_BPF \
 	-d KSU_SUSFS \
 	-d KPM \
 	-d KSU_DEBUG \
@@ -114,6 +115,7 @@ fi
 make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" olddefconfig >/dev/null
 
 log "config: $(grep -E '^CONFIG_(KSU|TOUCHSCREEN_FOCALTECH|TOUCHSCREEN_FTS|TOUCHSCREEN_XIAOMI_TOUCHFEATURE|PS5169|MACH_XIAOMI_[A-Z]+)=' "$CONFIG" | tr '\n' ' ')"
+log "fusebpf: $(grep -E '^CONFIG_(FUSE_BPF|FUSE_FS|BPF_SYSCALL)=' "$CONFIG" | tr '\n' ' ')"
 
 if [ "$KSU_MODE" != "noksu" ]; then
 	grep -q '^CONFIG_KSU=y' "$CONFIG" || die "CONFIG_KSU was not enabled"
