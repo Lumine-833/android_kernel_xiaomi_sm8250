@@ -103,7 +103,7 @@ log "applying kernel configuration"
 	-e PS5169 \
 	-e FUSE_BPF \
 	-d KSU_SUSFS \
-	-d KPM \
+	-e KPM \
 	-d KSU_DEBUG \
 	-d KSU_TAMPER_SYSCALL_TABLE \
 	-d CC_WERROR
