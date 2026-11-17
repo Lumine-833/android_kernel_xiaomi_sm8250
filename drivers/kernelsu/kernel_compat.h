@@ -352,13 +352,13 @@ struct ksu_static_key_true_false { struct static_key key; };
 #endif
 
 /*
- * KPM (extension/kpm) relies on kernel interfaces that are only supported
- * on 5.10+. Compile its call sites out entirely below that, regardless of
- * CONFIG_KPM, so 3.x/4.x/5.4 trees never pull in its headers, code or
- * runtime hooks. CPU spoof is not gated: cpu_spoof.c selects the kernel
- * ABI it needs per version and works back to 3.4.
+ * KPM (extension/kpm) upstream gate is 5.10+. Lower it to 4.19 for this
+ * kona tree: the KPM sources already carry <5.0 / <5.15 / <6.18 compat
+ * branches, and 4.19 provides set_memory.h. KALLSYMS/KALLSYMS_ALL are
+ * selected by CONFIG_KPM. Only compile in when CONFIG_KPM is enabled so
+ * trees that leave KPM off keep the original behaviour.
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0) && defined(CONFIG_KPM)
 #define KSU_CAN_USE_KPM
 #endif
 
