@@ -25,7 +25,10 @@ set_perm_recursive 0 0 750 750 $RAMDISK/init* $RAMDISK/sbin;
 
 # boot shell variables
 BLOCK=boot;
-IS_SLOT_DEVICE=0;
+# alioth (SM8250) is an A/B device: only boot_a/boot_b exist, no bare "boot".
+# 0 makes ak3-core look only for the bare name and abort on SukiSU in-app
+# flashing. auto detects the active slot and falls back cleanly if unavailable.
+IS_SLOT_DEVICE=auto;
 RAMDISK_COMPRESSION=auto;
 PATCH_VBMETA_FLAG=auto;
 
