@@ -98,11 +98,12 @@ log "applying kernel configuration"
 "$ROOT/scripts/config" --file "$CONFIG" \
 	-e KSU \
 	-e KSU_FEATURE_ADBROOT \
-	-e KSU_HACK_ARM64_BRANCH_LINK \
+	-e KSU_SUSFS \
+	-e KSU_SUSFS_INLINE_HOOK \
 	-e KSU_LSM_SECURITY_HOOKS \
 	-e PS5169 \
 	-e FUSE_BPF \
-	-d KSU_SUSFS \
+	-d KSU_HACK_ARM64_BRANCH_LINK \
 	-d KPM \
 	-d KSU_DEBUG \
 	-d KSU_TAMPER_SYSCALL_TABLE \
@@ -114,14 +115,28 @@ fi
 
 make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" olddefconfig >/dev/null
 
+# Stage 0（地基）: SUSFS 各隐藏功能的 callsite 钩子尚未移植，先关闭子功能，
+# 仅保留 SUSFS 核心与 su 通道。后续阶段逐项开启。
+"$ROOT/scripts/config" --file "$CONFIG" \
+	-d KSU_SUSFS_SUS_PATH \
+	-d KSU_SUSFS_SUS_MOUNT \
+	-d KSU_SUSFS_SUS_KSTAT \
+	-d KSU_SUSFS_SPOOF_UNAME \
+	-d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+	-d KSU_SUSFS_OPEN_REDIRECT \
+	-d KSU_SUSFS_SUS_MAP \
+	-d KSU_SUSFS_PRIORITY_UID_FILTER \
+	-d KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+
 log "config: $(grep -E '^CONFIG_(KSU|TOUCHSCREEN_FOCALTECH|TOUCHSCREEN_FTS|TOUCHSCREEN_XIAOMI_TOUCHFEATURE|PS5169|MACH_XIAOMI_[A-Z]+)=' "$CONFIG" | tr '\n' ' ')"
 log "fusebpf: $(grep -E '^CONFIG_(FUSE_BPF|FUSE_FS|BPF_SYSCALL)=' "$CONFIG" | tr '\n' ' ')"
 
 if [ "$KSU_MODE" != "noksu" ]; then
 	grep -q '^CONFIG_KSU=y' "$CONFIG" || die "CONFIG_KSU was not enabled"
-	grep -q '^CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y' "$CONFIG" || die "branch-link backend not enabled"
+	grep -q '^CONFIG_KSU_SUSFS=y' "$CONFIG" || die "SUSFS was not enabled"
+	grep -q '^CONFIG_KSU_SUSFS_INLINE_HOOK=y' "$CONFIG" || die "SUSFS inline hook backend not enabled"
 	grep -q '^CONFIG_KSU_LSM_SECURITY_HOOKS=y' "$CONFIG" || die "LSM hooks not enabled"
-	log "SukiSU Nova: enabled (builtin-new / ARM64 branch-link auto hooks)"
+	log "SukiSU Nova: enabled (builtin-new / SUSFS 2.4 inline hooks)"
 else
 	log "SukiSU Nova: disabled"
 fi
