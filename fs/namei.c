@@ -3879,6 +3879,18 @@ static struct file *path_openat(struct nameidata *nd,
 				const char *new_s = NULL;
 				terminate_walk(nd);
 				restore_nameidata();
+				/* 4.19: do_last() fuses lookup+open, so the first
+				 * walk already opened `file` (FMODE_OPENED set).
+				 * Reusing it for the redirected re-walk would trip
+				 * BUG_ON(file->f_mode & FMODE_OPENED). Drop the old
+				 * file and allocate a fresh one instead. */
+				fput(file);
+				file = alloc_empty_file(op->open_flag, current_cred());
+				if (IS_ERR(file)) {
+					nd->name = old_name;
+					putname(fake_filename);
+					return file;
+				}
 				set_nameidata(nd, old_dfd, fake_filename);
 				new_s = path_init(nd, flags);
 				while (!(error = link_path_walk(new_s, nd)) &&
