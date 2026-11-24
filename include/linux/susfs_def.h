@@ -5,6 +5,8 @@
 #include <linux/bitops.h>
 #include <linux/bitmap.h>
 #include <linux/string.h>
+#include <linux/cred.h>
+#include <linux/thread_info.h>
 
 /********/
 /* ENUM */
