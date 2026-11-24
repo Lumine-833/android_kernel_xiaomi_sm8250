@@ -115,13 +115,13 @@ fi
 
 make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" olddefconfig >/dev/null
 
-# Stage 0（地基）: SUSFS 各隐藏功能的 callsite 钩子尚未移植，先关闭子功能，
-# 仅保留 SUSFS 核心与 su 通道。后续阶段逐项开启。
+# Stage 1（伪装 uname）: 已移植 SPOOF_UNAME 的 callsite 钩子并开启；
+# 其余隐藏功能仍关闭，后续阶段逐项开启。
 "$ROOT/scripts/config" --file "$CONFIG" \
+	-e KSU_SUSFS_SPOOF_UNAME \
 	-d KSU_SUSFS_SUS_PATH \
 	-d KSU_SUSFS_SUS_MOUNT \
 	-d KSU_SUSFS_SUS_KSTAT \
-	-d KSU_SUSFS_SPOOF_UNAME \
 	-d KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
 	-d KSU_SUSFS_OPEN_REDIRECT \
 	-d KSU_SUSFS_SUS_MAP \
