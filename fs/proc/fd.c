@@ -12,10 +12,18 @@
 #include <linux/fs.h>
 
 #include <linux/proc_fs.h>
+#ifdef CONFIG_KSU_SUSFS
+#include <linux/susfs_def.h>
+#endif
 
 #include "../mount.h"
 #include "internal.h"
 #include "fd.h"
+
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);
+extern void susfs_sus_kstat_spoof_proc_fd_seq_show(int *out_target_mnt_id, unsigned long *out_target_ino, dev_t target_dev);
+#endif /* #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT */
 
 static int seq_show(struct seq_file *m, void *v)
 {
@@ -53,10 +61,29 @@ static int seq_show(struct seq_file *m, void *v)
 	if (ret)
 		return ret;
 
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+	if (susfs_is_current_app_uid()) {
+		struct inode *inode = file_inode(file);
+		bool is_fuse = false;
+		if (susfs_is_inode_sus_kstat(inode, &is_fuse)) {
+			int mnt_id = real_mount(file->f_path.mnt)->mnt_id;
+			unsigned long ino = inode->i_ino;
+			susfs_sus_kstat_spoof_proc_fd_seq_show(&mnt_id, &ino, inode->i_sb->s_dev);
+			seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\n",
+					(long long)file->f_pos, f_flags,
+					mnt_id);
+			goto bypass_orig_flow;
+		}
+	}
+#endif /* #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT */
+
 	seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\n",
 		   (long long)file->f_pos, f_flags,
 		   real_mount(file->f_path.mnt)->mnt_id);
 
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+bypass_orig_flow:
+#endif /* #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT */
 	show_fd_locks(m, file, files);
 	if (seq_has_overflowed(m))
 		goto out;
