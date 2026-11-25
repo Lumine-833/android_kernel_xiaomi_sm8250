@@ -667,6 +667,9 @@ out:
 }
 
 #ifdef CONFIG_KSU_SUSFS
+extern int susfs_security_context_to_sid(struct selinux_state *state,
+			    const char *scontext, u32 scontext_len, u32 *sid,
+			    gfp_t gfp);
 static ssize_t susfs_sel_write_context(struct file *file, char *buf, size_t size)
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
