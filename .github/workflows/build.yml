@@ -1,5 +1,5 @@
 name: Build Kernel
-# los24.0-suki-susfs：固定集成 SukiSU+SuSFS，构建产物自动发布到 Release。
+# los24.0-suki-susfs：固定集成 SukiSU+SuSFS，可选发布到 Release。
 
 on:
   workflow_dispatch:
@@ -21,6 +21,11 @@ on:
           - psyche
           - thyme
           - umi
+      release:
+        description: '将编译结果发布到Release'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -127,6 +132,7 @@ jobs:
           compression-level: 0
 
       - name: Publish release
+        if: inputs.release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.info.outputs.tag }}
