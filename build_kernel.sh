@@ -17,6 +17,8 @@
 #   ENABLE_FUSE_BPF=1   enable CONFIG_FUSE_BPF (kernel-side passthrough). Off by
 #                       default: with sdcardfs as the fuse backing it breaks
 #                       create/mkdir under Android/data and Android/obb.
+#   ENABLE_KPM=1        enable CONFIG_KPM (SukiSU KPM). Off by default; on
+#                       Linux 4.19 the KPM code is compiled out regardless.
 #
 set -euo pipefail
 
@@ -27,6 +29,12 @@ KSU_MODE="${2:-ksu}"
 case "${ENABLE_FUSE_BPF:-0}" in
 	1|[Tt][Rr][Uu][Ee]|[Yy][Ee][Ss]|[Oo][Nn]) FUSE_BPF=1 ;;
 	*) FUSE_BPF=0 ;;
+esac
+
+# KPM is opt-in (workflow checkbox). Default off.
+case "${ENABLE_KPM:-0}" in
+	1|[Tt][Rr][Uu][Ee]|[Yy][Ee][Ss]|[Oo][Nn]) KPM=1 ;;
+	*) KPM=0 ;;
 esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -109,6 +117,12 @@ else
 	FUSE_BPF_OPT=(-d FUSE_BPF)
 fi
 
+if [ "$KPM" = "1" ]; then
+	KPM_OPT=(-e KPM)
+else
+	KPM_OPT=(-d KPM)
+fi
+
 log "applying kernel configuration"
 "$ROOT/scripts/config" --file "$CONFIG" \
 	-e KSU \
@@ -118,7 +132,7 @@ log "applying kernel configuration"
 	-e PS5169 \
 	"${FUSE_BPF_OPT[@]}" \
 	-d KSU_SUSFS \
-	-d KPM \
+	"${KPM_OPT[@]}" \
 	-d KSU_DEBUG \
 	-d KSU_TAMPER_SYSCALL_TABLE \
 	-d CC_WERROR
@@ -131,6 +145,7 @@ make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" olddefconfig >/dev/null
 
 log "config: $(grep -E '^CONFIG_(KSU|TOUCHSCREEN_FOCALTECH|TOUCHSCREEN_FTS|TOUCHSCREEN_XIAOMI_TOUCHFEATURE|PS5169|MACH_XIAOMI_[A-Z]+)=' "$CONFIG" | tr '\n' ' ')"
 log "fusebpf: requested=$FUSE_BPF | $(grep -E '^CONFIG_(FUSE_BPF|FUSE_FS|BPF_SYSCALL)=' "$CONFIG" | tr '\n' ' ')"
+log "kpm: requested=$KPM | $(grep -E '^CONFIG_KPM=' "$CONFIG" | tr '\n' ' ')"
 
 if [ "$FUSE_BPF" = "1" ]; then
 	grep -q '^CONFIG_FUSE_BPF=y' "$CONFIG" || die "CONFIG_FUSE_BPF was requested but is not enabled"
@@ -140,6 +155,16 @@ else
 		die "CONFIG_FUSE_BPF is still enabled but was not requested"
 	fi
 	log "FUSE-BPF: disabled (standard FUSE path, sdcardfs safe)"
+fi
+
+if [ "$KPM" = "1" ]; then
+	grep -q '^CONFIG_KPM=y' "$CONFIG" || die "CONFIG_KPM was requested but is not enabled"
+	log "KPM: enabled (note: KPM code is compiled out on Linux 4.19)"
+else
+	if grep -q '^CONFIG_KPM=y' "$CONFIG"; then
+		die "CONFIG_KPM is still enabled but was not requested"
+	fi
+	log "KPM: disabled"
 fi
 
 if [ "$KSU_MODE" != "noksu" ]; then
