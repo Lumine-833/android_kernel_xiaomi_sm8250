@@ -22,12 +22,12 @@ on:
           - thyme
           - umi
       fusebpf:
-        description: '启用 FUSE-BPF 内核直通（默认关闭；开启后 sdcardfs 场景可能出现 Android/data 读写异常）'
+        description: '启用 FUSE-BPF 内核直通'
         required: true
         default: false
         type: boolean
       kpm:
-        description: '启用 KPM 内核模块（默认关闭；注意：本内核为 Linux 4.19，KPM 代码会被编译剔除）'
+        description: '启用 KPM 内核模块'
         required: true
         default: false
         type: boolean
