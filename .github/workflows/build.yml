@@ -130,6 +130,10 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
           echo "ksu_release=$KSU_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "device_model=$DEVICE_MODEL" >> "$GITHUB_OUTPUT"
+          echo "ksu_display=$KSU_DISPLAY" >> "$GITHUB_OUTPUT"
+          echo "build_time_tz=$BUILD_TIME_TZ" >> "$GITHUB_OUTPUT"
+          echo "features=$FEATURES" >> "$GITHUB_OUTPUT"
           echo "build_time_full=$BUILD_TIME_FULL" >> "$GITHUB_OUTPUT"
           echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
           echo "zip_base=$ZIP_BASE" >> "$GITHUB_OUTPUT"
@@ -154,12 +158,11 @@ jobs:
           tag_name: ${{ steps.info.outputs.tag }}
           name: ${{ steps.info.outputs.release_name }}
           body: |
-            设备代号：`${{ inputs.device }}`
-            KSU集成方式：`${{ steps.info.outputs.ksu_release }}`
-            FUSE-BPF：`${{ inputs.fusebpf && '开启' || '关闭' }}`
-            KPM：`${{ inputs.kpm && '开启' || '关闭' }}`
+            设备型号：`${{ steps.info.outputs.device_model }}`
+            KSU集成方式：`${{ steps.info.outputs.ksu_display }}`
             提交编号：`${{ github.sha }}`
-            构建时间：`${{ steps.info.outputs.build_time_full }}`
+            构建时间：`${{ steps.info.outputs.build_time_tz }}`
+            内核特征：${{ steps.info.outputs.features }}
           files: ${{ steps.info.outputs.zip_name }}
           fail_on_unmatched_files: true
         env:
