@@ -21,6 +21,11 @@ on:
           - psyche
           - thyme
           - umi
+      fusebpf:
+        description: '启用 FUSE-BPF 内核直通（默认关闭；开启后 sdcardfs 场景可能出现 Android/data 读写异常）'
+        required: true
+        default: false
+        type: boolean
       release:
         description: '将编译结果发布到Release'
         required: true
@@ -98,9 +103,13 @@ jobs:
             ccache-
 
       - name: Compile check KernelSU object
+        env:
+          ENABLE_FUSE_BPF: ${{ inputs.fusebpf }}
         run: KSU_CHECK_ONLY=1 bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Build kernel
+        env:
+          ENABLE_FUSE_BPF: ${{ inputs.fusebpf }}
         run: bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Show ccache statistics
@@ -140,6 +149,7 @@ jobs:
           body: |
             设备代号：`${{ inputs.device }}`
             KSU集成方式：`${{ steps.info.outputs.ksu_release }}`
+            FUSE-BPF：`${{ inputs.fusebpf && '开启' || '关闭' }}`
             提交编号：`${{ github.sha }}`
             构建时间：`${{ steps.info.outputs.build_time_full }}`
           files: ${{ steps.info.outputs.zip_name }}

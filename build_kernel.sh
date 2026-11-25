@@ -12,13 +12,22 @@
 #            noksu   -> build a clean kernel
 #
 # Env:
-#   KSU_CHECK_ONLY=1   only compile drivers/kernelsu/ksu.o (fast syntax/API check)
-#   OUT_DIR=<path>     override output directory (default: ./out)
+#   KSU_CHECK_ONLY=1    only compile drivers/kernelsu/ksu.o (fast syntax/API check)
+#   OUT_DIR=<path>      override output directory (default: ./out)
+#   ENABLE_FUSE_BPF=1   enable CONFIG_FUSE_BPF (kernel-side passthrough). Off by
+#                       default: with sdcardfs as the fuse backing it breaks
+#                       create/mkdir under Android/data and Android/obb.
 #
 set -euo pipefail
 
 DEVICE="${1:-munch}"
 KSU_MODE="${2:-ksu}"
+
+# FUSE-BPF is opt-in (workflow checkbox). Default off.
+case "${ENABLE_FUSE_BPF:-0}" in
+	1|[Tt][Rr][Uu][Ee]|[Yy][Ee][Ss]|[Oo][Nn]) FUSE_BPF=1 ;;
+	*) FUSE_BPF=0 ;;
+esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT="${OUT_DIR:-$ROOT/out}"
@@ -94,6 +103,12 @@ fi
 log "merging device fragments: ${MERGE_LIST[*]}"
 "$ROOT/scripts/kconfig/merge_config.sh" -m -O "$OUT" "$CONFIG" "${MERGE_LIST[@]}" >/dev/null
 
+if [ "$FUSE_BPF" = "1" ]; then
+	FUSE_BPF_OPT=(-e FUSE_BPF)
+else
+	FUSE_BPF_OPT=(-d FUSE_BPF)
+fi
+
 log "applying kernel configuration"
 "$ROOT/scripts/config" --file "$CONFIG" \
 	-e KSU \
@@ -102,7 +117,7 @@ log "applying kernel configuration"
 	-e KSU_SUSFS_INLINE_HOOK \
 	-e KSU_LSM_SECURITY_HOOKS \
 	-e PS5169 \
-	-e FUSE_BPF \
+	"${FUSE_BPF_OPT[@]}" \
 	-d KSU_HACK_ARM64_BRANCH_LINK \
 	-d KPM \
 	-d KSU_DEBUG \
@@ -130,7 +145,17 @@ make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" olddefconfig >/dev/null
 	-e KSU_SUSFS_SUS_MOUNT
 
 log "config: $(grep -E '^CONFIG_(KSU|TOUCHSCREEN_FOCALTECH|TOUCHSCREEN_FTS|TOUCHSCREEN_XIAOMI_TOUCHFEATURE|PS5169|MACH_XIAOMI_[A-Z]+)=' "$CONFIG" | tr '\n' ' ')"
-log "fusebpf: $(grep -E '^CONFIG_(FUSE_BPF|FUSE_FS|BPF_SYSCALL)=' "$CONFIG" | tr '\n' ' ')"
+log "fusebpf: requested=$FUSE_BPF | $(grep -E '^CONFIG_(FUSE_BPF|FUSE_FS|BPF_SYSCALL)=' "$CONFIG" | tr '\n' ' ')"
+
+if [ "$FUSE_BPF" = "1" ]; then
+	grep -q '^CONFIG_FUSE_BPF=y' "$CONFIG" || die "CONFIG_FUSE_BPF was requested but is not enabled"
+	log "FUSE-BPF: enabled (kernel backing passthrough)"
+else
+	if grep -q '^CONFIG_FUSE_BPF=y' "$CONFIG"; then
+		die "CONFIG_FUSE_BPF is still enabled but was not requested"
+	fi
+	log "FUSE-BPF: disabled (standard FUSE path, sdcardfs safe)"
+fi
 
 if [ "$KSU_MODE" != "noksu" ]; then
 	grep -q '^CONFIG_KSU=y' "$CONFIG" || die "CONFIG_KSU was not enabled"
