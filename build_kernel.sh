@@ -52,6 +52,23 @@ case "$DEVICE" in
 	'') die "empty device codename" ;;
 esac
 
+# Retail names for the SM8250/SM8250-AC codenames shipped by this tree.
+case "$DEVICE" in
+	alioth) DEVICE_MODEL="Redmi K40" ;;
+	apollo) DEVICE_MODEL="Redmi K30S Ultra" ;;
+	cas)    DEVICE_MODEL="Xiaomi Mi 10 Ultra" ;;
+	dagu)   DEVICE_MODEL="Xiaomi Pad 5 Pro 12.4" ;;
+	elish)  DEVICE_MODEL="Xiaomi Pad 5 Pro" ;;
+	enuma)  DEVICE_MODEL="Xiaomi Pad 5 Pro 5G" ;;
+	lmi)    DEVICE_MODEL="Redmi K30 Pro" ;;
+	munch)  DEVICE_MODEL="Redmi K40S" ;;
+	psyche) DEVICE_MODEL="Xiaomi 12X" ;;
+	thyme)  DEVICE_MODEL="Xiaomi Mi 10S" ;;
+	umi)    DEVICE_MODEL="Xiaomi Mi 10" ;;
+	*)      DEVICE_MODEL="$DEVICE" ;;
+esac
+DEVICE_LABEL="$DEVICE_MODEL ($DEVICE)"
+
 export ARCH=arm64
 export SUBARCH=arm64
 export LC_ALL=C
@@ -202,6 +219,41 @@ IMAGE="$OUT/arch/arm64/boot/Image"
 [ -f "$IMAGE" ] || die "kernel image not produced at $IMAGE"
 log "kernel image: $IMAGE ($(du -h "$IMAGE" | cut -f1))"
 
+# ---------------------------------------------------------------- build info
+# The numeric SukiSU version is computed by drivers/kernelsu/Makefile while it
+# is parsed, and printed as "-- SukiSU-Nova version: <n> [...]". Re-entering
+# that directory after the full build is a no-op, and lets us capture it.
+KSU_VERSION_NUM=""
+if [ "$KSU_MODE" != "noksu" ]; then
+	KSU_VERSION_NUM="$(make "${MAKE_OPTS[@]}" "${TOOLCHAIN[@]}" drivers/kernelsu/ 2>&1 \
+		| sed -n 's/^-- .* version: \([0-9][0-9]*\).*/\1/p' | head -n1 || true)"
+	if [ -z "$KSU_VERSION_NUM" ]; then
+		KSU_VERSION_NUM="unknown"
+	fi
+	KSU_DISPLAY="SukiSU v${KSU_VERSION_NUM}"
+else
+	KSU_DISPLAY="NoKSU"
+fi
+
+# This branch never enables SUSFS, so only Fuse BPF and KPM are listed.
+FEATURES=""
+append_feature() {
+	if [ -z "$FEATURES" ]; then
+		FEATURES="$1"
+	else
+		FEATURES="$FEATURES | $1"
+	fi
+}
+if [ "$FUSE_BPF" = "1" ]; then
+	append_feature '`Fuse BPF`'
+fi
+if [ "$KPM" = "1" ]; then
+	append_feature '`KPM`'
+fi
+if [ -z "$FEATURES" ]; then
+	FEATURES='`None`'
+fi
+
 # ---------------------------------------------------------------- package
 KSU_TAG="sukisu"
 [ "$KSU_MODE" = "noksu" ] && KSU_TAG="NoKSU"
@@ -214,6 +266,11 @@ BUILD_DATE="$(TZ="$TZ_SPEC" date +%Y%m%d)"
 BUILD_TIME="$(TZ="$TZ_SPEC" date +%H%M%S)"
 BUILD_STAMP="$(TZ="$TZ_SPEC" date +%Y-%m-%d-%H:%M:%S)"
 BUILD_TIME_FULL="$(TZ="$TZ_SPEC" date '+%Y-%m-%d %H:%M:%S')"
+TZ_LABEL="UTC${TZ_SIGN}${TZ_HH}"
+if [ "$TZ_MM" != "00" ]; then
+	TZ_LABEL="${TZ_LABEL}:${TZ_MM}"
+fi
+BUILD_TIME_TZ="${BUILD_TIME_FULL} ${TZ_LABEL}"
 ZIP_BASE="Kernel_${DEVICE}_${KSU_TAG}_${BUILD_DATE}_${BUILD_TIME}_anykernel3"
 TMP_ZIP=".ak3_${DEVICE}_pending.zip"
 
@@ -236,7 +293,11 @@ log "flashable zip: $ROOT/$ZIP_NAME"
 	printf "TAG='v%s-%s'\n" "$BUILD_DATE" "$BUILD_TIME"
 	printf "RELEASE_NAME='Kernel for %s [%s]'\n" "$DEVICE" "$KSU_RELEASE"
 	printf "KSU_RELEASE='%s'\n" "$KSU_RELEASE"
+	printf "DEVICE_MODEL='%s'\n" "$DEVICE_LABEL"
+	printf "KSU_DISPLAY='%s'\n" "$KSU_DISPLAY"
 	printf "BUILD_TIME_FULL='%s'\n" "$BUILD_TIME_FULL"
+	printf "BUILD_TIME_TZ='%s'\n" "$BUILD_TIME_TZ"
+	printf "FEATURES='%s'\n" "$FEATURES"
 	printf "ZIP_NAME='%s'\n" "$ZIP_NAME"
 	printf "ZIP_BASE='%s'\n" "$ZIP_BASE"
 	printf "MD5=%s\n" "$MD5_8"
@@ -244,3 +305,4 @@ log "flashable zip: $ROOT/$ZIP_NAME"
 
 log "tag:     v${BUILD_DATE}-${BUILD_TIME}"
 log "release: Kernel for ${DEVICE} [${KSU_RELEASE}]"
+log "model:   ${DEVICE_LABEL} | ${KSU_DISPLAY} | ${FEATURES}"
