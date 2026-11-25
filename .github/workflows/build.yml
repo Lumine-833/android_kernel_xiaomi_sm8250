@@ -26,6 +26,11 @@ on:
         required: true
         default: false
         type: boolean
+      kpm:
+        description: '启用 KPM 内核模块（默认关闭；注意：本内核为 Linux 4.19，KPM 代码会被编译剔除）'
+        required: true
+        default: false
+        type: boolean
       release:
         description: '将编译结果发布到Release'
         required: true
@@ -105,11 +110,13 @@ jobs:
       - name: Compile check KernelSU object
         env:
           ENABLE_FUSE_BPF: ${{ inputs.fusebpf }}
+          ENABLE_KPM: ${{ inputs.kpm }}
         run: KSU_CHECK_ONLY=1 bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Build kernel
         env:
           ENABLE_FUSE_BPF: ${{ inputs.fusebpf }}
+          ENABLE_KPM: ${{ inputs.kpm }}
         run: bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Show ccache statistics
@@ -150,6 +157,7 @@ jobs:
             设备代号：`${{ inputs.device }}`
             KSU集成方式：`${{ steps.info.outputs.ksu_release }}`
             FUSE-BPF：`${{ inputs.fusebpf && '开启' || '关闭' }}`
+            KPM：`${{ inputs.kpm && '开启' || '关闭' }}`
             提交编号：`${{ github.sha }}`
             构建时间：`${{ steps.info.outputs.build_time_full }}`
           files: ${{ steps.info.outputs.zip_name }}
