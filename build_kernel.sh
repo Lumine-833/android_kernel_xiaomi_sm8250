@@ -169,12 +169,9 @@ IMAGE="$OUT/arch/arm64/boot/Image"
 log "kernel image: $IMAGE ($(du -h "$IMAGE" | cut -f1))"
 
 # ---------------------------------------------------------------- package
-KSU_TAG="sukisu"
-[ "$KSU_MODE" = "noksu" ] && KSU_TAG="NoKSU"
-
-# Release-facing KSU label: title/body use SukiSU or NoKSU (zip naming keeps KSU_TAG).
-KSU_RELEASE="SukiSU"
-[ "$KSU_MODE" = "noksu" ] && KSU_RELEASE="NoKSU"
+# 本分支固定集成 SukiSU + SuSFS，命名与 release 标签统一为 SukiSU+SuSFS。
+KSU_TAG="sukisu-susfs"
+KSU_RELEASE="SukiSU+SuSFS"
 
 BUILD_DATE="$(TZ="$TZ_SPEC" date +%Y%m%d)"
 BUILD_TIME="$(TZ="$TZ_SPEC" date +%H%M%S)"

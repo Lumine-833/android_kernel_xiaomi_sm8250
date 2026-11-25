@@ -1,5 +1,5 @@
 name: Build Kernel
-# susfs-test 测试分支：禁止发布到 Release（已移除 release 输入与发布步骤）。
+# los24.0-suki-susfs：固定集成 SukiSU+SuSFS，构建产物自动发布到 Release。
 
 on:
   workflow_dispatch:
@@ -21,11 +21,6 @@ on:
           - psyche
           - thyme
           - umi
-      ksu:
-        description: '集成 SukiSU Nova (builtin-new分支注入)'
-        required: true
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -36,7 +31,7 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ inputs.device }}-${{ inputs.ksu }}
+    name: ${{ inputs.device }}-sukisu-susfs
     runs-on: ubuntu-22.04
     timeout-minutes: 180
 
@@ -98,16 +93,10 @@ jobs:
             ccache-
 
       - name: Compile check KernelSU object
-        if: inputs.ksu
         run: KSU_CHECK_ONLY=1 bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Build kernel
-        run: |
-          if [ "${{ inputs.ksu }}" = "true" ]; then
-            bash ./build_kernel.sh "${{ inputs.device }}" ksu
-          else
-            bash ./build_kernel.sh "${{ inputs.device }}" noksu
-          fi
+        run: bash ./build_kernel.sh "${{ inputs.device }}" ksu
 
       - name: Show ccache statistics
         if: always()
@@ -136,3 +125,18 @@ jobs:
             out/.config
           if-no-files-found: error
           compression-level: 0
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.tag }}
+          name: ${{ steps.info.outputs.release_name }}
+          body: |
+            设备代号：`${{ inputs.device }}`
+            KSU集成方式：`${{ steps.info.outputs.ksu_release }}`
+            提交编号：`${{ github.sha }}`
+            构建时间：`${{ steps.info.outputs.build_time_full }}`
+          files: ${{ steps.info.outputs.zip_name }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
